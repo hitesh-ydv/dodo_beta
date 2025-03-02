@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Dodo Webview",
+    "slug": "MyApp",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/2025_Transparant-19-modified.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/2025_Transparant-15.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "web": {
+      "favicon": "./assets/2025_Transparant-19-modified.png"
+    }
+  }
+}
