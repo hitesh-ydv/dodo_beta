@@ -16,7 +16,7 @@ import {
 import WebView from 'react-native-webview';
 import { useCallback } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { NavigationContainer, useFocusEffect  } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -28,13 +28,13 @@ const HomeScreen = ({ navigation }) => {
   const [isHeaderEnabled, setHeaderEnabled] = useState(true);
   const [isAutoRotationEnabled, setAutoRotationEnabled] = useState(false);
   const [isHttpsRequired, setHttpsRequired] = useState(true);
-  const [baseUrl, setBaseUrl] = useState('');
-  const [urlParams, setUrlParams] = useState('');
   const [theme, setTheme] = useState('light');
   const [isLoadingWebView, setLoadingWebView] = useState(false);
   const [isLoadingSafari, setLoadingSafari] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
+  const [urlParams, setUrlParams] = useState('');
 
-  const saveSettings = async () => {
+  const saveSettings = async (baseUrl, urlParams) => {
     try {
       await AsyncStorage.setItem('userSettings', JSON.stringify({ baseUrl, urlParams }));
       console.log('Settings saved:', { baseUrl, urlParams });
@@ -59,7 +59,7 @@ const HomeScreen = ({ navigation }) => {
     StatusBar.setHidden(false, 'fade');
   }, []);
 
-    useFocusEffect(
+  useFocusEffect(
     useCallback(() => {
       // Ensure the correct status bar color is applied when coming back
       StatusBar.setBarStyle(theme === 'dark' ? 'light-content' : 'dark-content');
@@ -70,10 +70,28 @@ const HomeScreen = ({ navigation }) => {
     try {
       const savedSettings = await AsyncStorage.getItem('userSettings');
       if (savedSettings) {
-        const { baseUrl: savedBaseUrl, urlParams: savedUrlParams } = JSON.parse(savedSettings);
-        setBaseUrl(savedBaseUrl || '');
-        setUrlParams(savedUrlParams || '');
-        console.log('Loaded settings:', { savedBaseUrl, savedUrlParams });
+        const { baseUrl, urlParams } = JSON.parse(savedSettings);
+
+        if (baseUrl && urlParams) { // Ensure values exist
+          setBaseUrl(baseUrl);
+          setUrlParams(urlParams);
+
+          Alert.alert(
+            'Open Previous Website?',
+            'Do you want to open the previously saved website?',
+            [
+              {
+                text: 'Cancel', style: 'cancel', onPress: () => {
+                },
+              },
+              { text: 'OK', onPress: () => handleOpenWebView(baseUrl, urlParams) },
+            ]
+          );
+
+          console.log('Loaded settings:', { baseUrl, urlParams });
+        } else {
+          console.log('Saved settings are empty.');
+        }
       } else {
         console.log('No saved settings found.');
       }
@@ -82,16 +100,18 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    loadSettings(); // Load settings when the app starts
-  },[]);
+
 
   useEffect(() => {
-    saveSettings(); // Save settings when baseUrl or urlParams change
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    saveSettings(baseUrl, urlParams);
   }, [baseUrl, urlParams]);
 
 
-  const handleOpenWebView = async () => {
+  const handleOpenWebView = async (baseUrl, urlParams) => {
     setLoadingWebView(true);
     const fullUrl = `${baseUrl}${urlParams}`;
     console.log(fullUrl)
@@ -131,7 +151,6 @@ const HomeScreen = ({ navigation }) => {
 
                 const validUrl = response.data.valid_url;
                 if (validUrl) {
-                  console.log(response)
                   if (isHttpsRequired && httpCheck) {
                     console.log(httpCheck)
                     navigation.navigate('WebView', {
@@ -145,7 +164,7 @@ const HomeScreen = ({ navigation }) => {
                       showHeader: !isHeaderEnabled,
                       isAutoRotationEnabled: isAutoRotationEnabled,
                     });
-                  } else if(isHttpsRequired && !httpCheck){
+                  } else if (isHttpsRequired && !httpCheck) {
                     Alert.alert('Error', 'The URL is not valid.');
                   }
 
@@ -181,8 +200,6 @@ const HomeScreen = ({ navigation }) => {
           },
         }
       );
-
-      console.log(response)
 
       const validUrl = response.data.valid_url;
       if (validUrl) {
@@ -334,7 +351,7 @@ const HomeScreen = ({ navigation }) => {
       <FadeInView duration={350}>
         <TouchableOpacity
           style={styles.button}
-          onPress={handleOpenWebView}
+          onPress={() => handleOpenWebView(baseUrl, urlParams)}
           disabled={isLoadingWebView}
         >
           {isLoadingWebView ? (
@@ -432,7 +449,7 @@ const Stack = createStackNavigator();
 const App = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ autoHideHomeIndicator: true }}>
         <Stack.Screen
           name="Home"
           component={HomeScreen}
@@ -468,7 +485,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 10,
   },
-  
+
   logo: {
     width: 200,
     height: 150,
