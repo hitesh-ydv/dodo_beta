@@ -51,7 +51,7 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
-            <Text style={styles.proceedText}>Proceed</Text>
+            <Text style={styles.proceedText}>OK</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -147,16 +147,19 @@ const HomeScreen = ({ navigation }) => {
       setHttpsRequired(isHttpsRequired);
 
       if (baseUrl || urlParams) {
-        Alert.alert(
-          'Open Previous Website?',
-          'Do you want to open the previously saved website?',
-          [
-            {
-              text: 'Cancel', style: 'cancel', onPress: () => StatusBar.setHidden(false),
-            },
-            { text: 'OK', onPress: () => handleOpenWebView(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired) },
-          ]
-        );
+        setPopup({
+          visible: true,
+          title: 'Open Previous Website',
+          message: 'Do you want to open the previously saved website?',
+          onCancel: () => {
+              setLoadingWebView(false);
+              setPopup(prev => ({ ...prev, visible: false }));
+          },
+          onConfirm: async () => {
+              setPopup(prev => ({ ...prev, visible: false }));
+              await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
+          },
+      });
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -198,7 +201,14 @@ const HomeScreen = ({ navigation }) => {
         console.log("Full URL -", fullUrl);
 
         if (!baseUrl) {
-            setPopup({ visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.' });
+            setPopup({ visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.',
+              onCancel: () => {
+                setLoadingWebView(false);
+                setPopup(prev => ({ ...prev, visible: false }));
+            },                onConfirm: async () => {
+              setPopup(prev => ({ ...prev, visible: false }));
+          },
+             });
             setLoadingWebView(false);
             return;
         }
@@ -264,7 +274,10 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
                     visible: true, 
                     title: 'Error', 
                     message: 'The URL is not HTTPS-compliant.', 
-                    onCancel: () => setPopup(prev => ({ ...prev, visible: false })) 
+                    onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
+                    onConfirm: async () => {
+                      setPopup(prev => ({ ...prev, visible: false }));
+                  } 
                 });
             }
         } else {
@@ -272,7 +285,10 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
                 visible: true, 
                 title: 'Error', 
                 message: response.data.error || 'Invalid URL.', 
-                onCancel: () => setPopup(prev => ({ ...prev, visible: false })) 
+                onCancel: () => setPopup(prev => ({ ...prev, visible: false })), 
+                onConfirm: async () => {
+                    setPopup(prev => ({ ...prev, visible: false }));
+                }
             });
         }
     } catch (error) {
@@ -281,7 +297,10 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
             visible: true, 
             title: 'Error', 
             message: 'Failed to validate the URL.', 
-            onCancel: () => setPopup(prev => ({ ...prev, visible: false })) 
+            onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
+            onConfirm: async () => {
+              setPopup(prev => ({ ...prev, visible: false }));
+          } 
         });
     } finally {
         setLoadingWebView(false);
@@ -298,6 +317,19 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
       await Linking.openURL(fullUrl);
     } catch (err) {
       Alert.alert('Error', 'Failed to open URL in Safari.');
+      setPopup({
+        visible: true,
+        title: 'Error',
+        message: 'Failed to open URL in Safari.',
+        onCancel: () => {
+            setLoadingWebView(false);
+            setPopup(prev => ({ ...prev, visible: false }));
+        },
+        onConfirm: async () => {
+            setPopup(prev => ({ ...prev, visible: false }));
+        },
+    });
+      
     } finally {
       setLoadingSafari(false);
     }
