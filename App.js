@@ -42,21 +42,21 @@ const HomeScreen = ({ navigation }) => {
 
   const CustomPopup = ({ visible, title, message, onCancel, onConfirm }) => (
     <Modal transparent visible={visible} animationType="fade">
-    <View style={styles.modalBackground}>
-      <View style={styles.popupContainer}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
-            <Text style={styles.proceedText}>OK</Text>
-          </TouchableOpacity>
+      <View style={styles.modalBackground}>
+        <View style={styles.popupContainer}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
+              <Text style={styles.proceedText}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
+    </Modal>
   );
 
   const saveSettings = async (baseUrl, urlParams) => {
@@ -125,7 +125,7 @@ const HomeScreen = ({ navigation }) => {
       const switchSettings = await AsyncStorage.getItem('switchSettings');
 
       let baseUrl = '', urlParams = '';
-      let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true; 
+      let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
 
       if (savedSettings) {
         const parsedSettings = JSON.parse(savedSettings);
@@ -152,14 +152,14 @@ const HomeScreen = ({ navigation }) => {
           title: 'Open Previous Website',
           message: 'Do you want to open the previously saved website?',
           onCancel: () => {
-              setLoadingWebView(false);
-              setPopup(prev => ({ ...prev, visible: false }));
+            setLoadingWebView(false);
+            setPopup(prev => ({ ...prev, visible: false }));
           },
           onConfirm: async () => {
-              setPopup(prev => ({ ...prev, visible: false }));
-              await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
+            setPopup(prev => ({ ...prev, visible: false }));
+            await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
           },
-      });
+        });
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -182,130 +182,131 @@ const HomeScreen = ({ navigation }) => {
 
     // Load the latest stored switch settings before proceeding
     try {
-        const switchSettings = await AsyncStorage.getItem('switchSettings');
-        let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
+      const switchSettings = await AsyncStorage.getItem('switchSettings');
+      let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
 
-        if (switchSettings) {
-            const parsedSwitches = JSON.parse(switchSettings);
-            isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? true;
-            isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? true;
-            isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
-        }
+      if (switchSettings) {
+        const parsedSwitches = JSON.parse(switchSettings);
+        isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? true;
+        isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? true;
+        isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
+      }
 
-        console.log("Opening WebView with settings:");
-        console.log("Header Enabled:", isHeaderEnabled);
-        console.log("Auto Rotation Enabled:", isAutoRotationEnabled);
-        console.log("HTTPS Required:", isHttpsRequired);
+      console.log("Opening WebView with settings:");
+      console.log("Header Enabled:", isHeaderEnabled);
+      console.log("Auto Rotation Enabled:", isAutoRotationEnabled);
+      console.log("HTTPS Required:", isHttpsRequired);
 
-        const fullUrl = `${baseUrl}${urlParams}`;
-        console.log("Full URL -", fullUrl);
+      const fullUrl = `${baseUrl}${urlParams}`;
+      console.log("Full URL -", fullUrl);
 
-        if (!baseUrl) {
-            setPopup({ visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.',
-              onCancel: () => {
-                setLoadingWebView(false);
-                setPopup(prev => ({ ...prev, visible: false }));
-            },                onConfirm: async () => {
-              setPopup(prev => ({ ...prev, visible: false }));
-          },
-             });
+      if (!baseUrl) {
+        setPopup({
+          visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.',
+          onCancel: () => {
             setLoadingWebView(false);
-            return;
-        }
-
-        // If Auto Rotation is enabled, show popup first
-        if (isAutoRotationEnabled) {
-            setPopup({
-                visible: true,
-                title: 'Orientation Lock Check',
-                message: 'For Auto Rotation to work, please disable your device\'s orientation lock (via Control Center).',
-                onCancel: () => {
-                    setLoadingWebView(false);
-                    setPopup(prev => ({ ...prev, visible: false }));
-                },
-                onConfirm: async () => {
-                    setPopup(prev => ({ ...prev, visible: false }));
-                    await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
-                },
-            });
-            return;
-        }
-
-        // Directly validate and navigate if Auto Rotation is off
-        await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
-
-    } catch (error) {
-        console.error("Error loading switch settings:", error);
-        setPopup({ visible: true, title: 'Error', message: 'Failed to load switch settings.' });
-        setLoadingWebView(false);
-    }
-};
-
-const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired) => {
-    try {
-        setLoadingWebView(true);
-
-        const formData = new FormData();
-        formData.append('url', baseUrl);
-        formData.append('https', isHttpsRequired ? 'true' : 'false');
-        formData.append('perameter', urlParams);
-
-        console.log("Sending request with data:", formData);
-
-        const response = await axios.post('https://mobiledetects.com/valid-url', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+            setPopup(prev => ({ ...prev, visible: false }));
+          }, onConfirm: async () => {
+            setPopup(prev => ({ ...prev, visible: false }));
+          },
         });
+        setLoadingWebView(false);
+        return;
+      }
 
-        console.log("API Response:", response.data);
+      // If Auto Rotation is enabled, show popup first
+      if (isAutoRotationEnabled) {
+        setPopup({
+          visible: true,
+          title: 'Orientation Lock Check',
+          message: 'For Auto Rotation to work, please disable your device\'s orientation lock (via Control Center).',
+          onCancel: () => {
+            setLoadingWebView(false);
+            setPopup(prev => ({ ...prev, visible: false }));
+          },
+          onConfirm: async () => {
+            setPopup(prev => ({ ...prev, visible: false }));
+            await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
+          },
+        });
+        return;
+      }
 
-        const httpCheck = response.data.https;
-        const validUrl = response.data.valid_url;
-        const status = response.data.status;
+      // Directly validate and navigate if Auto Rotation is off
+      await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
 
-        if (status !== 'error') {
-            if ((isHttpsRequired && httpCheck) || !isHttpsRequired) {
-                navigation.navigate('WebView', {
-                    url: `${validUrl}${urlParams}`,
-                    showHeader: !isHeaderEnabled,
-                    isAutoRotationEnabled: isAutoRotationEnabled,
-                });
-            } else {
-                setPopup({ 
-                    visible: true, 
-                    title: 'Error', 
-                    message: 'The URL is not HTTPS-compliant.', 
-                    onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
-                    onConfirm: async () => {
-                      setPopup(prev => ({ ...prev, visible: false }));
-                  } 
-                });
-            }
-        } else {
-            setPopup({ 
-                visible: true, 
-                title: 'Error', 
-                message: response.data.error || 'Invalid URL.', 
-                onCancel: () => setPopup(prev => ({ ...prev, visible: false })), 
-                onConfirm: async () => {
-                    setPopup(prev => ({ ...prev, visible: false }));
-                }
-            });
-        }
     } catch (error) {
-        console.error('Error during API call:', error.response || error);
-        setPopup({ 
-            visible: true, 
-            title: 'Error', 
-            message: 'Failed to validate the URL.', 
+      console.error("Error loading switch settings:", error);
+      setPopup({ visible: true, title: 'Error', message: 'Failed to load switch settings.' });
+      setLoadingWebView(false);
+    }
+  };
+
+  const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired) => {
+    try {
+      setLoadingWebView(true);
+
+      const formData = new FormData();
+      formData.append('url', baseUrl);
+      formData.append('https', isHttpsRequired ? 'true' : 'false');
+      formData.append('perameter', urlParams);
+
+      console.log("Sending request with data:", formData);
+
+      const response = await axios.post('https://mobiledetects.com/valid-url', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      console.log("API Response:", response.data);
+
+      const httpCheck = response.data.https;
+      const validUrl = response.data.valid_url;
+      const status = response.data.status;
+
+      if (status !== 'error') {
+        if ((isHttpsRequired && httpCheck) || !isHttpsRequired) {
+          navigation.navigate('WebView', {
+            url: `${validUrl}${urlParams}`,
+            showHeader: !isHeaderEnabled,
+            isAutoRotationEnabled: isAutoRotationEnabled,
+          });
+        } else {
+          setPopup({
+            visible: true,
+            title: 'Error',
+            message: 'The URL is not HTTPS-compliant.',
             onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
             onConfirm: async () => {
               setPopup(prev => ({ ...prev, visible: false }));
-          } 
+            }
+          });
+        }
+      } else {
+        setPopup({
+          visible: true,
+          title: 'Error',
+          message: response.data.error || 'Invalid URL.',
+          onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
+          onConfirm: async () => {
+            setPopup(prev => ({ ...prev, visible: false }));
+          }
         });
+      }
+    } catch (error) {
+      console.error('Error during API call:', error.response || error);
+      setPopup({
+        visible: true,
+        title: 'Error',
+        message: 'Failed to validate the URL.',
+        onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
+        onConfirm: async () => {
+          setPopup(prev => ({ ...prev, visible: false }));
+        }
+      });
     } finally {
-        setLoadingWebView(false);
+      setLoadingWebView(false);
     }
-};
+  };
 
 
 
@@ -322,14 +323,14 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
         title: 'Error',
         message: 'Failed to open URL in Safari.',
         onCancel: () => {
-            setLoadingWebView(false);
-            setPopup(prev => ({ ...prev, visible: false }));
+          setLoadingWebView(false);
+          setPopup(prev => ({ ...prev, visible: false }));
         },
         onConfirm: async () => {
-            setPopup(prev => ({ ...prev, visible: false }));
+          setPopup(prev => ({ ...prev, visible: false }));
         },
-    });
-      
+      });
+
     } finally {
       setLoadingSafari(false);
     }
@@ -381,7 +382,7 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
           source={require('./assets/2025_Transparant-15.png')}
           style={styles.logo}
           resizeMode="contain"
-        /> 
+        />
       </FadeInView>
 
       <FadeInView duration={350}>
@@ -508,9 +509,7 @@ const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRo
 
 const WebViewScreen = ({ route, navigation }) => {
   const { url, showHeader, isAutoRotationEnabled } = route.params;
-  const [isAdPage, setIsAdPage] = useState(false);
-
-  const webViewRef = useRef(null); // Ref to reload the same page
+  const webViewRef = useRef(null);
 
   useEffect(() => {
     if (showHeader) {
@@ -531,38 +530,49 @@ const WebViewScreen = ({ route, navigation }) => {
     };
   }, [showHeader, isAutoRotationEnabled]);
 
-  const handleNavigationStateChange = (navState) => {
-    // Check if the URL matches the specific ad link
-    if (navState.url.startsWith('https://user')) {
-      Linking.openURL(navState.url).catch((err) => console.error('Error opening URL:', err));
-      return false; // Prevent WebView from navigating to this URL
-    }
-  };
+  const handleShouldStartLoadWithRequest = (event) => {
+    // Check if the URL starts with "https://user"
+    if (event.url.startsWith('https://user')) {
+      // Open in Safari instead of WebView
+      Linking.openURL(event.url)
+        .then(() => console.log('Opened in external browser'))
+        .catch((err) => console.error('Error opening URL:', err));
 
+      // Force WebView to stay on the original page
+      if (webViewRef.current) {
+        webViewRef.current.stopLoading(); // Prevents the error page
+        webViewRef.current.reload(); // Reloads the correct page
+      }
+
+      return false; // Block WebView from loading this URL
+    }
+
+    return true; // Allow other URLs (e.g., https://netfree.cc/ads.php) to load in WebView
+  };
 
   return (
     <View style={{ flex: 1 }}>
-      {showHeader && (
-        <SafeAreaView style={styles.header}>
-        </SafeAreaView>
-      )}
+      {showHeader && <SafeAreaView style={styles.header} />}
       <WebView
-        source={{ uri: url }}
+        ref={webViewRef}
+        source={{ uri: url }} // Start with this URL
         style={{ flex: 1 }}
         originWhitelist={['*']}
-        mediaPlaybackRequiresUserAction={false}  // Automatically play media
-        allowsInlineMediaPlayback={true}         // Allow inline playback for videos
-        javaScriptEnabled={true}                  // Enable JavaScript for interactive content
-        domStorageEnabled={true}                  // Enable DOM storage
-        prefersHomeIndicatorAutoHidden={true}     // Hide the home indicator
-        contentInsetAdjustmentBehavior="never"    // Prevent safe area adjustment
-        allowUniversalAccessFromFileURLs={true}   // Allow file URLs to access data
+        mediaPlaybackRequiresUserAction={false}
+        allowsInlineMediaPlayback={true}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        prefersHomeIndicatorAutoHidden={true}
+        contentInsetAdjustmentBehavior="never"
+        allowUniversalAccessFromFileURLs={true}
         useWebKit={true}
-        onNavigationStateChange={handleNavigationStateChange}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest} // Intercept ad URLs
       />
     </View>
   );
 };
+
+
 
 const Stack = createStackNavigator();
 
@@ -640,6 +650,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: '100%',
     alignSelf: 'center',
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.17,
+    shadowRadius: 3.05,
+    elevation: 4
   },
   button2: {
     backgroundColor: '#f2f2f2',
@@ -649,6 +667,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: '100%',
     alignSelf: 'center',
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.17,
+    shadowRadius: 3.05,
+    elevation: 4
   },
   buttonText: {
     fontSize: 16,
