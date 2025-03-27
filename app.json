@@ -19,10 +19,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/2025_Transparant-19-modified.png",
         "backgroundColor": "#000000"
-      }
+      },
+      "package": "com.sameer353.MyApp"
     },
     "web": {
       "favicon": "./assets/2025_Transparant-19-modified.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "38e575ce-d0c8-4204-829f-77e7c58c6be5"
+      }
     }
   }
 }

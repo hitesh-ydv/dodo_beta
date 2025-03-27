@@ -27,46 +27,82 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import FadeInView from 'react-native-fade-in-view';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import Ripple from 'react-native-material-ripple';
 
 const HomeScreen = ({ navigation }) => {
-  const [isHeaderEnabled, setHeaderEnabled] = useState(true);
-  const [isAutoRotationEnabled, setAutoRotationEnabled] = useState(true);
-  const [isHttpsRequired, setHttpsRequired] = useState(true);
+  const [isHeaderEnabled, setHeaderEnabled] = useState(false);
+  const [isAutoRotationEnabled, setAutoRotationEnabled] = useState(false);
+  const [isHttpsRequired, setHttpsRequired] = useState(false);
   const [theme, setTheme] = useState('light');
   const [isLoadingWebView, setLoadingWebView] = useState(false);
   const [isLoadingSafari, setLoadingSafari] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [urlParams, setUrlParams] = useState('');
   const [popup, setPopup] = useState({ visible: false, title: '', message: '', onCancel: null, onConfirm: null });
+  const [popup2, setPopup2] = useState({ visible: false, title: '', message: '', onCancel: null, onConfirm: null });
 
-  const CustomPopup = ({ visible, title, message, onCancel, onConfirm }) => (
-    <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.modalBackground}>
-        <View style={styles.popupContainer}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
-              <Text style={styles.proceedText}>OK</Text>
-            </TouchableOpacity>
+
+  const CustomPopup = ({ visible, title, message, onCancel, onConfirm }) => {
+
+    return (
+      <Modal transparent visible={visible} animationType='fade'>
+        <View style={styles.modalBackground}>
+          <View style={styles.popupContainer}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
+                <Text style={styles.proceedText}>OK</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    )
+  }
+
+  const CustomPopup2 = ({ visible, title, message, onCancel, onConfirm }) => {
+
+    return (
+      <Modal transparent visible={visible} animationType='fade'>
+        <View style={styles.modalBackground}>
+          <View style={styles.popupContainer}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.proceedButton} onPress={onConfirm}>
+                <Text style={styles.proceedText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    )
+  };
 
   const saveSettings = async (baseUrl, urlParams) => {
     try {
       await AsyncStorage.setItem('userSettings', JSON.stringify({ baseUrl, urlParams }));
-      console.log('Settings saved:', { baseUrl, urlParams });
     } catch (error) {
       console.error('Error saving settings:', error);
     }
   };
+
+  const clearStorage = async () => {
+    try {
+      await AsyncStorage.clear();
+      console.log('Local storage cleared');
+    } catch (error) {
+      console.error('Error clearing local storage:', error);
+    }
+  };
+
+  // // Call this function when needed
+  // clearStorage();
+
+
 
   const saveSwitchSettings = async (newSettings) => {
     try {
@@ -74,7 +110,6 @@ const HomeScreen = ({ navigation }) => {
       const parsedSettings = existingSettings ? JSON.parse(existingSettings) : {};
       const updatedSettings = { ...parsedSettings, ...newSettings };
       await AsyncStorage.setItem('switchSettings', JSON.stringify(updatedSettings));
-      console.log('Switch settings saved:', updatedSettings);
     } catch (error) {
       console.error('Error saving switch settings:', error);
     }
@@ -85,9 +120,27 @@ const HomeScreen = ({ navigation }) => {
     saveSwitchSettings({ isHeaderEnabled: value });
   };
 
-  const handleToggleAutoRotation = (value) => {
+  const handleToggleAutoRotation = async (value) => {
     setAutoRotationEnabled(value);
-    saveSwitchSettings({ isAutoRotationEnabled: value });
+    await saveSwitchSettings({ isAutoRotationEnabled: value });
+    // Wait for state to update before checking orientation
+    setTimeout(async () => {
+      if (value) {
+        await ScreenOrientation.unlockAsync();
+      } else {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      }
+    }, 500); // Delay for state update
+    if (value) {
+      setPopup2({
+        visible: true,
+        title: 'Lock Orientation Mode',
+        message: 'If you want to ON auto rotation, just turn off your Lock orientation Mode from Device Settings',
+        onConfirm: async () => {
+          setPopup2(prev => ({ ...prev, visible: false }));
+        },
+      });
+    }
   };
 
   const handleToggleHttps = (value) => {
@@ -124,8 +177,9 @@ const HomeScreen = ({ navigation }) => {
       const savedSettings = await AsyncStorage.getItem('userSettings');
       const switchSettings = await AsyncStorage.getItem('switchSettings');
 
-      let baseUrl = '', urlParams = '';
+      let baseUrl = 'https://google.com', urlParams = '';
       let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
+
 
       if (savedSettings) {
         const parsedSettings = JSON.parse(savedSettings);
@@ -140,37 +194,51 @@ const HomeScreen = ({ navigation }) => {
         isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
       }
 
+      console.log("Load isAutoRotation", isAutoRotationEnabled);
+
+
       setBaseUrl(baseUrl);
       setUrlParams(urlParams);
       setHeaderEnabled(isHeaderEnabled);
       setAutoRotationEnabled(isAutoRotationEnabled);
       setHttpsRequired(isHttpsRequired);
 
+      setTimeout(async () => {
+        if (isAutoRotationEnabled) {
+          await ScreenOrientation.unlockAsync();
+        } else {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        }
+      }, 500);
+
+
+
       if (baseUrl || urlParams) {
-        setPopup({
-          visible: true,
-          title: 'Open Previous Website',
-          message: 'Do you want to open the previously saved website?',
-          onCancel: () => {
-            setLoadingWebView(false);
-            setPopup(prev => ({ ...prev, visible: false }));
-          },
-          onConfirm: async () => {
-            setPopup(prev => ({ ...prev, visible: false }));
-            await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
-          },
-        });
+        if (baseUrl != 'https://google.com') {
+          setPopup({
+            visible: true,
+            title: 'Open Previous Website',
+            message: 'Do you want to open the previously saved website?',
+            onCancel: () => {
+              setLoadingWebView(false);
+              setPopup(prev => ({ ...prev, visible: false }));
+            },
+            onConfirm: async () => {
+              setPopup(prev => ({ ...prev, visible: false }));
+              await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
+            },
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
+
   useEffect(() => {
     loadSettings();
   }, []);
-
-
 
   useEffect(() => {
     saveSettings(baseUrl, urlParams);
@@ -192,6 +260,7 @@ const HomeScreen = ({ navigation }) => {
         isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
       }
 
+
       console.log("Opening WebView with settings:");
       console.log("Header Enabled:", isHeaderEnabled);
       console.log("Auto Rotation Enabled:", isAutoRotationEnabled);
@@ -201,36 +270,16 @@ const HomeScreen = ({ navigation }) => {
       console.log("Full URL -", fullUrl);
 
       if (!baseUrl) {
-        setPopup({
-          visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.',
-          onCancel: () => {
-            setLoadingWebView(false);
-            setPopup(prev => ({ ...prev, visible: false }));
-          }, onConfirm: async () => {
-            setPopup(prev => ({ ...prev, visible: false }));
+        setPopup2({
+          visible: true, title: 'Error', message: 'Invalid URL. Please enter a valid base URL.'
+          , onConfirm: async () => {
+            setPopup2(prev => ({ ...prev, visible: false }));
           },
         });
         setLoadingWebView(false);
         return;
       }
 
-      // If Auto Rotation is enabled, show popup first
-      if (isAutoRotationEnabled) {
-        setPopup({
-          visible: true,
-          title: 'Orientation Lock Check',
-          message: 'For Auto Rotation to work, please disable your device\'s orientation lock (via Control Center).',
-          onCancel: () => {
-            setLoadingWebView(false);
-            setPopup(prev => ({ ...prev, visible: false }));
-          },
-          onConfirm: async () => {
-            setPopup(prev => ({ ...prev, visible: false }));
-            await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
-          },
-        });
-        return;
-      }
 
       // Directly validate and navigate if Auto Rotation is off
       await validateAndNavigate(baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired);
@@ -241,6 +290,7 @@ const HomeScreen = ({ navigation }) => {
       setLoadingWebView(false);
     }
   };
+
 
   const validateAndNavigate = async (baseUrl, urlParams, isHeaderEnabled, isAutoRotationEnabled, isHttpsRequired) => {
     try {
@@ -271,36 +321,33 @@ const HomeScreen = ({ navigation }) => {
             isAutoRotationEnabled: isAutoRotationEnabled,
           });
         } else {
-          setPopup({
+          setPopup2({
             visible: true,
             title: 'Error',
             message: 'The URL is not HTTPS-compliant.',
-            onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
             onConfirm: async () => {
-              setPopup(prev => ({ ...prev, visible: false }));
+              setPopup2(prev => ({ ...prev, visible: false }));
             }
           });
         }
       } else {
-        setPopup({
+        setPopup2({
           visible: true,
           title: 'Error',
           message: response.data.error || 'Invalid URL.',
-          onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
           onConfirm: async () => {
-            setPopup(prev => ({ ...prev, visible: false }));
+            setPopup2(prev => ({ ...prev, visible: false }));
           }
         });
       }
     } catch (error) {
       console.error('Error during API call:', error.response || error);
-      setPopup({
+      setPopup2({
         visible: true,
         title: 'Error',
         message: 'Failed to validate the URL.',
-        onCancel: () => setPopup(prev => ({ ...prev, visible: false })),
         onConfirm: async () => {
-          setPopup(prev => ({ ...prev, visible: false }));
+          setPopup2(prev => ({ ...prev, visible: false }));
         }
       });
     } finally {
@@ -310,24 +357,19 @@ const HomeScreen = ({ navigation }) => {
 
 
 
-
   const handleOpenInSafari = async () => {
     setLoadingSafari(true);
     const fullUrl = `${baseUrl}${urlParams}`;
     try {
       await Linking.openURL(fullUrl);
     } catch (err) {
-      Alert.alert('Error', 'Failed to open URL in Safari.');
-      setPopup({
+      // Alert.alert('Error', 'Failed to open URL in Safari.');
+      setPopup2({
         visible: true,
         title: 'Error',
         message: 'Failed to open URL in Safari.',
-        onCancel: () => {
-          setLoadingWebView(false);
-          setPopup(prev => ({ ...prev, visible: false }));
-        },
         onConfirm: async () => {
-          setPopup(prev => ({ ...prev, visible: false }));
+          setPopup2(prev => ({ ...prev, visible: false }));
         },
       });
 
@@ -361,6 +403,14 @@ const HomeScreen = ({ navigation }) => {
         message={popup.message}
         onCancel={popup.onCancel}
         onConfirm={popup.onConfirm}
+      />
+
+      <CustomPopup2
+        visible={popup2.visible}
+        title={popup2.title}
+        message={popup2.message}
+        onCancel={popup2.onCancel}
+        onConfirm={popup2.onConfirm}
       />
       {/* Theme Toggle Icon */}
       <TouchableOpacity
@@ -510,14 +560,36 @@ const HomeScreen = ({ navigation }) => {
 const WebViewScreen = ({ route, navigation }) => {
   const { url, showHeader, isAutoRotationEnabled } = route.params;
   const webViewRef = useRef(null);
+  const [isPortrait, setIsPortrait] = useState(true); // Track orientation
+
+  // Function to check current orientation
+  const checkOrientation = async () => {
+    const orientation = await ScreenOrientation.getOrientationAsync();
+    setIsPortrait(
+      orientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
+      orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN
+    );
+  };
+
+
+  StatusBar.setBarStyle('light-content'); // Set status bar text color to white
 
   useEffect(() => {
-    if (showHeader) {
-      StatusBar.setHidden(false);
-    } else {
-      StatusBar.setHidden(true);
-    }
+    // Check initial orientation
+    checkOrientation();
 
+    // Subscribe to orientation changes
+    const subscription = ScreenOrientation.addOrientationChangeListener((event) => {
+      const newOrientation = event.orientationInfo.orientation;
+      setIsPortrait(
+        newOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
+        newOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN
+      );
+    });
+
+    StatusBar.setHidden(!showHeader || !isPortrait); // Hide if not portrait
+
+    // Handle screen rotation lock/unlock
     if (isAutoRotationEnabled) {
       ScreenOrientation.unlockAsync();
     } else {
@@ -527,6 +599,7 @@ const WebViewScreen = ({ route, navigation }) => {
     return () => {
       StatusBar.setHidden(false);
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT);
+      ScreenOrientation.removeOrientationChangeListener(subscription);
     };
   }, [showHeader, isAutoRotationEnabled]);
 
@@ -547,12 +620,12 @@ const WebViewScreen = ({ route, navigation }) => {
       return false; // Block WebView from loading this URL
     }
 
-    return true; // Allow other URLs (e.g., https://netfree.cc/ads.php) to load in WebView
+    return true; // Allow other URLs (e.g., https://google.com) to load in WebView
   };
 
   return (
     <View style={{ flex: 1 }}>
-      {showHeader && <SafeAreaView style={styles.header} />}
+      {showHeader && isPortrait && <SafeAreaView style={styles.header} />}
       <WebView
         ref={webViewRef}
         source={{ uri: url }} // Start with this URL
@@ -688,7 +761,7 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 50,
-    backgroundColor: '#F15A29',
+    backgroundColor: '#333',
     justifyContent: 'center',
     alignItems: 'center',
   },
