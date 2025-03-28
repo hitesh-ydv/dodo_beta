@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
-  Button
+  Button,
+  PanResponder
 } from 'react-native';
 import WebView from 'react-native-webview';
 import { useCallback } from 'react';
@@ -82,6 +83,31 @@ const HomeScreen = ({ navigation }) => {
     )
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      let timeoutId;
+  
+      const lockPortrait = async () => {
+        try {
+          // Lock orientation hard
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  
+          // Fallback lock in case it still rotates
+          timeoutId = setTimeout(() => {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          }, 500);
+        } catch (e) {
+          console.warn('Error forcing portrait on Home screen:', e);
+        }
+      };
+      StatusBar.setHidden(true, 'fade');
+  
+      lockPortrait();
+  
+      return () => clearTimeout(timeoutId);
+    }, [])
+  );
+
   const saveSettings = async (baseUrl, urlParams) => {
     try {
       await AsyncStorage.setItem('userSettings', JSON.stringify({ baseUrl, urlParams }));
@@ -124,13 +150,6 @@ const HomeScreen = ({ navigation }) => {
     setAutoRotationEnabled(value);
     await saveSwitchSettings({ isAutoRotationEnabled: value });
     // Wait for state to update before checking orientation
-    setTimeout(async () => {
-      if (value) {
-        await ScreenOrientation.unlockAsync();
-      } else {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      }
-    }, 500); // Delay for state update
     if (value) {
       setPopup2({
         visible: true,
@@ -178,7 +197,7 @@ const HomeScreen = ({ navigation }) => {
       const switchSettings = await AsyncStorage.getItem('switchSettings');
 
       let baseUrl = 'https://google.com', urlParams = '';
-      let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
+      let isHeaderEnabled = false, isAutoRotationEnabled = false, isHttpsRequired = false;
 
 
       if (savedSettings) {
@@ -189,9 +208,9 @@ const HomeScreen = ({ navigation }) => {
 
       if (switchSettings) {
         const parsedSwitches = JSON.parse(switchSettings);
-        isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? true;
-        isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? true;
-        isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
+        isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? false;
+        isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? false;
+        isHttpsRequired = parsedSwitches.isHttpsRequired ?? false;
       }
 
       console.log("Load isAutoRotation", isAutoRotationEnabled);
@@ -202,14 +221,6 @@ const HomeScreen = ({ navigation }) => {
       setHeaderEnabled(isHeaderEnabled);
       setAutoRotationEnabled(isAutoRotationEnabled);
       setHttpsRequired(isHttpsRequired);
-
-      setTimeout(async () => {
-        if (isAutoRotationEnabled) {
-          await ScreenOrientation.unlockAsync();
-        } else {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        }
-      }, 500);
 
 
 
@@ -251,13 +262,13 @@ const HomeScreen = ({ navigation }) => {
     // Load the latest stored switch settings before proceeding
     try {
       const switchSettings = await AsyncStorage.getItem('switchSettings');
-      let isHeaderEnabled = true, isAutoRotationEnabled = true, isHttpsRequired = true;
+      let isHeaderEnabled = false, isAutoRotationEnabled = false, isHttpsRequired = false;
 
       if (switchSettings) {
         const parsedSwitches = JSON.parse(switchSettings);
-        isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? true;
-        isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? true;
-        isHttpsRequired = parsedSwitches.isHttpsRequired ?? true;
+        isHeaderEnabled = parsedSwitches.isHeaderEnabled ?? false;
+        isAutoRotationEnabled = parsedSwitches.isAutoRotationEnabled ?? false;
+        isHttpsRequired = parsedSwitches.isHttpsRequired ?? false;
       }
 
 
@@ -561,6 +572,32 @@ const WebViewScreen = ({ route, navigation }) => {
   const { url, showHeader, isAutoRotationEnabled } = route.params;
   const webViewRef = useRef(null);
   const [isPortrait, setIsPortrait] = useState(true); // Track orientation
+  const [isButtonVisible, setButtonVisible] = useState(true); // Track button visibility 
+  const timerRef = useRef(null); // Store reference to timeout 
+  const [canGoBack, setCanGoBack] = useState(false); // Track if WebView can go back
+
+
+  useFocusEffect(
+    useCallback(() => {
+      const applyOrientationSetting = async () => {
+        try {
+          const switchSettings = await AsyncStorage.getItem('switchSettings');
+          const parsed = switchSettings ? JSON.parse(switchSettings) : {};
+          const autoRotation = parsed.isAutoRotationEnabled ?? false;
+
+          if (autoRotation) {
+            await ScreenOrientation.unlockAsync();
+          } else {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          }
+        } catch (e) {
+          console.error('Orientation error on WebView screen:', e);
+        }
+      };
+
+      applyOrientationSetting();
+    }, [])
+  )
 
   // Function to check current orientation
   const checkOrientation = async () => {
@@ -570,6 +607,11 @@ const WebViewScreen = ({ route, navigation }) => {
       orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN
     );
   };
+
+  // Hide the floating button after 3 seconds of inactivity 
+  const hideButtonAfterTimeout = () => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setButtonVisible(false), 3000); };
+
+  const handleUserInteraction = () => { setButtonVisible(true); hideButtonAfterTimeout(); };
 
 
   StatusBar.setBarStyle('light-content'); // Set status bar text color to white
@@ -587,14 +629,11 @@ const WebViewScreen = ({ route, navigation }) => {
       );
     });
 
+    // Start the timeout to hide the button after 3 seconds of inactivity
+    hideButtonAfterTimeout();
+
     StatusBar.setHidden(!showHeader || !isPortrait); // Hide if not portrait
 
-    // Handle screen rotation lock/unlock
-    if (isAutoRotationEnabled) {
-      ScreenOrientation.unlockAsync();
-    } else {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
-    }
 
     return () => {
       StatusBar.setHidden(false);
@@ -623,8 +662,13 @@ const WebViewScreen = ({ route, navigation }) => {
     return true; // Allow other URLs (e.g., https://google.com) to load in WebView
   };
 
+  const handleNavigationStateChange = (navState) => { setCanGoBack(navState.canGoBack); };
+
+  // Handle swipe gesture (left to right) to go back in WebView history 
+  const panResponder = useRef(PanResponder.create({ onStartShouldSetPanResponder: (e, gestureState) => { return gestureState.dx < -50 && e.nativeEvent.pageX < 50; }, onPanResponderMove: (e, gestureState) => { if (gestureState.dx < -50) { if (canGoBack && webViewRef.current) { webViewRef.current.goBack(); } } }, })).current;
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onTouchStart={handleUserInteraction} {...panResponder.panHandlers}>
       {showHeader && isPortrait && <SafeAreaView style={styles.header} />}
       <WebView
         ref={webViewRef}
@@ -640,7 +684,21 @@ const WebViewScreen = ({ route, navigation }) => {
         allowUniversalAccessFromFileURLs={true}
         useWebKit={true}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest} // Intercept ad URLs
+        onNavigationStateChange={handleNavigationStateChange}
       />
+      {/* Floating Button */}
+      {isButtonVisible && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => {
+            navigation.popToTop();
+          }}
+        >
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonText}>Home</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -661,7 +719,7 @@ const App = () => {
         <Stack.Screen
           name="WebView"
           component={WebViewScreen}
-          options={{ headerShown: false }}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -688,7 +746,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 10,
   },
-
   logo: {
     width: 200,
     height: 150,
@@ -825,6 +882,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: 'orange',
+    borderRadius: 30, // Half of width/height for perfect circle
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5, // For Android shadow
+    shadowColor: '#000', // For iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  buttonContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonTextFloating: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  }
 });
 
 export default App;
