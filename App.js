@@ -28,6 +28,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import FadeInView from 'react-native-fade-in-view';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Entypo from '@expo/vector-icons/Entypo';
 
 const HomeScreen = ({ navigation }) => {
   const [isHeaderEnabled, setHeaderEnabled] = useState(false);
@@ -86,12 +87,12 @@ const HomeScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       let timeoutId;
-  
+
       const lockPortrait = async () => {
         try {
           // Lock orientation hard
           await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-  
+
           // Fallback lock in case it still rotates
           timeoutId = setTimeout(() => {
             ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
@@ -101,9 +102,9 @@ const HomeScreen = ({ navigation }) => {
         }
       };
       StatusBar.setHidden(true, 'fade');
-  
+
       lockPortrait();
-  
+
       return () => clearTimeout(timeoutId);
     }, [])
   );
@@ -344,7 +345,7 @@ const HomeScreen = ({ navigation }) => {
       } else {
         setPopup2({
           visible: true,
-          title: 'Error',
+          title: 'Enable Https',
           message: response.data.error || 'Invalid URL.',
           onConfirm: async () => {
             setPopup2(prev => ({ ...prev, visible: false }));
@@ -574,7 +575,14 @@ const WebViewScreen = ({ route, navigation }) => {
   const [isPortrait, setIsPortrait] = useState(true); // Track orientation
   const [isButtonVisible, setButtonVisible] = useState(true); // Track button visibility 
   const timerRef = useRef(null); // Store reference to timeout 
-  const [canGoBack, setCanGoBack] = useState(false); // Track if WebView can go back
+  const [canGoBack, setCanGoBack] = useState(false);
+
+  // Update navigation options based on canGoBack state
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: !canGoBack, // Only enable React Navigation gesture when no web history
+    });
+  }, [canGoBack, navigation]);
 
 
   useFocusEffect(
@@ -616,7 +624,10 @@ const WebViewScreen = ({ route, navigation }) => {
 
   StatusBar.setBarStyle('light-content'); // Set status bar text color to white
 
+
+
   useEffect(() => {
+
     // Check initial orientation
     checkOrientation();
 
@@ -662,42 +673,45 @@ const WebViewScreen = ({ route, navigation }) => {
     return true; // Allow other URLs (e.g., https://google.com) to load in WebView
   };
 
-  const handleNavigationStateChange = (navState) => { setCanGoBack(navState.canGoBack); };
-
-  // Handle swipe gesture (left to right) to go back in WebView history 
-  const panResponder = useRef(PanResponder.create({ onStartShouldSetPanResponder: (e, gestureState) => { return gestureState.dx < -50 && e.nativeEvent.pageX < 50; }, onPanResponderMove: (e, gestureState) => { if (gestureState.dx < -50) { if (canGoBack && webViewRef.current) { webViewRef.current.goBack(); } } }, })).current;
 
   return (
-    <View style={{ flex: 1 }} onTouchStart={handleUserInteraction} {...panResponder.panHandlers}>
+    <View style={{ flex: 1 }} onTouchStart={handleUserInteraction}>
       {showHeader && isPortrait && <SafeAreaView style={styles.header} />}
       <WebView
+        key={url}
         ref={webViewRef}
         source={{ uri: url }} // Start with this URL
         style={{ flex: 1 }}
         originWhitelist={['*']}
         mediaPlaybackRequiresUserAction={false}
-        allowsInlineMediaPlayback={true}
+        allowsInlineMediaPlayback={!showHeader}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         prefersHomeIndicatorAutoHidden={true}
         contentInsetAdjustmentBehavior="never"
         allowUniversalAccessFromFileURLs={true}
+        allowsBackForwardNavigationGestures={true}  // Enable swipe gestures
+        bounces={false}
         useWebKit={true}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest} // Intercept ad URLs
-        onNavigationStateChange={handleNavigationStateChange}
+        onNavigationStateChange={(navState) => {
+          setCanGoBack(navState.canGoBack);
+        }}
       />
       {/* Floating Button */}
       {isButtonVisible && (
-        <TouchableOpacity
-          style={styles.floatingButton}
-          onPress={() => {
-            navigation.popToTop();
-          }}
-        >
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonText}>Home</Text>
-          </View>
-        </TouchableOpacity>
+        <FadeInView duration={0} delay={1000}>
+          <TouchableOpacity
+            style={styles.floatingButton}
+            onPress={() => {
+              navigation.popToTop();
+            }}
+          >
+            <View style={styles.buttonContent}>
+              <Entypo name="home" size={10} color="white" />
+            </View>
+          </TouchableOpacity>
+        </FadeInView>
       )}
     </View>
   );
@@ -710,7 +724,11 @@ const Stack = createStackNavigator();
 const App = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ autoHideHomeIndicator: true }}>
+      <Stack.Navigator screenOptions={{
+        gestureEnabled: true, // Keep this enabled globally
+        gestureResponseDistance: 30, // Adjust swipe sensitivity
+        fullScreenGestureEnabled: true // For iOS native gesture
+      }}>
         <Stack.Screen
           name="Home"
           component={HomeScreen}
@@ -719,7 +737,7 @@ const App = () => {
         <Stack.Screen
           name="WebView"
           component={WebViewScreen}
-          options={{ headerShown: false, gestureEnabled: false }}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -884,19 +902,19 @@ const styles = StyleSheet.create({
   },
   floatingButton: {
     position: 'absolute',
-    bottom: 30,
-    right: 20,
-    backgroundColor: 'orange',
+    bottom: 90,
+    right: 10,
+    backgroundColor: 'black',
     borderRadius: 30, // Half of width/height for perfect circle
-    width: 60,
-    height: 60,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5, // For Android shadow
-    shadowColor: '#000', // For iOS shadow
+    shadowColor: 'white', // For iOS shadow
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOpacity: 1,
+    shadowRadius: 7,
   },
   buttonContent: {
     justifyContent: 'center',
@@ -905,7 +923,7 @@ const styles = StyleSheet.create({
   buttonTextFloating: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 0,
   }
 });
 

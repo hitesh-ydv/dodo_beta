@@ -7,18 +7,21 @@
     "icon": "./assets/2025_Transparant-19-modified.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "splash": {
-      "image": "./assets/2025_Transparant-15.png",
+      "image": "./assets/2025_Transparant-19-modified.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dodowebview.app",
+      "buildNumber": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/2025_Transparant-19-modified.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#ffffff"
       },
       "package": "com.sameer353.MyApp"
     },
