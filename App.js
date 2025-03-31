@@ -14,10 +14,10 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
-  Button,
-  PanResponder
+  Animated
 } from 'react-native';
 import WebView from 'react-native-webview';
+import Constants from "expo-constants";
 import { useCallback } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
@@ -576,6 +576,57 @@ const WebViewScreen = ({ route, navigation }) => {
   const [isButtonVisible, setButtonVisible] = useState(true); // Track button visibility 
   const timerRef = useRef(null); // Store reference to timeout 
   const [canGoBack, setCanGoBack] = useState(false);
+  const [shouldRenderButton, setShouldRenderButton] = useState(false);
+  const buttonPosition = useRef(new Animated.Value(100)).current; // Start off-screen
+  const isMounted = useRef(true);
+  const isPortraitRef = useRef(isPortrait);
+
+    // Sync ref with portrait state
+    useEffect(() => {
+      isPortraitRef.current = isPortrait;
+    }, [isPortrait]);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Button animation handler
+  useEffect(() => {
+    if (!isMounted.current) return;
+
+    const showButton = isButtonVisible && isPortraitRef.current;
+    
+    if (showButton) {
+      setShouldRenderButton(true);
+      Animated.spring(buttonPosition, {
+        toValue: 0,
+        speed: 20,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.spring(buttonPosition, {
+        toValue: 100,
+        speed: 20,
+        useNativeDriver: true,
+      }).start(() => {
+        if (isMounted.current && !isButtonVisible) {
+          setShouldRenderButton(false);
+        }
+      });
+    }
+
+    return () => buttonPosition.stopAnimation();
+  }, [isButtonVisible, isPortrait]);
+
+    // Orientation change handler
+    useEffect(() => {
+      if (!isPortrait) {
+        // Immediately hide button when switching to landscape
+        setButtonVisible(false);
+      }
+    }, [isPortrait]);
 
   // Update navigation options based on canGoBack state
   useEffect(() => {
@@ -583,6 +634,7 @@ const WebViewScreen = ({ route, navigation }) => {
       gestureEnabled: !canGoBack, // Only enable React Navigation gesture when no web history
     });
   }, [canGoBack, navigation]);
+
 
 
   useFocusEffect(
@@ -616,13 +668,30 @@ const WebViewScreen = ({ route, navigation }) => {
     );
   };
 
-  // Hide the floating button after 3 seconds of inactivity 
-  const hideButtonAfterTimeout = () => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setButtonVisible(false), 3000); };
+  const hideButtonAfterTimeout = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (isMounted.current) setButtonVisible(false);
+    }, 3000);
+  };
 
-  const handleUserInteraction = () => { setButtonVisible(true); hideButtonAfterTimeout(); };
+  const handleUserInteraction = () => {
+    if (!isButtonVisible && isMounted.current) {
+      setButtonVisible(true);
+    }
+    hideButtonAfterTimeout();
+  };
 
 
   StatusBar.setBarStyle('light-content'); // Set status bar text color to white
+
+  useEffect(() => {
+    if (showHeader) {
+      StatusBar.setHidden(true);
+    } else {
+      StatusBar.setHidden(false);
+    }
+  }, []);
 
 
 
@@ -673,14 +742,33 @@ const WebViewScreen = ({ route, navigation }) => {
     return true; // Allow other URLs (e.g., https://google.com) to load in WebView
   };
 
+  console.log("portrait -", isPortrait)
+  // const UserAgent = WebView.new(request.user_agent)
+
+  const [userAgent, setUserAgent] = useState("");
+
+  useEffect(() => {
+    const fetchUserAgent = async () => {
+      try {
+        const defaultUserAgent = await Constants.getWebViewUserAgentAsync();
+        setUserAgent(defaultUserAgent + " /os.gatuIOS v1.0");
+      } catch (error) {
+        console.log("Error fetching user agent:", error);
+      }
+    };
+
+    fetchUserAgent();
+  }, []);
+
 
   return (
     <View style={{ flex: 1 }} onTouchStart={handleUserInteraction}>
-      {showHeader && isPortrait && <SafeAreaView style={styles.header} />}
+      {showHeader && isPortrait && <SafeAreaView style={styles.header} />} 
+      
       <WebView
         key={url}
         ref={webViewRef}
-        source={{ uri: url }} // Start with this URL
+        source={{ uri: url }}
         style={{ flex: 1 }}
         originWhitelist={['*']}
         mediaPlaybackRequiresUserAction={false}
@@ -690,28 +778,26 @@ const WebViewScreen = ({ route, navigation }) => {
         prefersHomeIndicatorAutoHidden={true}
         contentInsetAdjustmentBehavior="never"
         allowUniversalAccessFromFileURLs={true}
-        allowsBackForwardNavigationGestures={true}  // Enable swipe gestures
+        allowsBackForwardNavigationGestures={true}
         bounces={false}
-        useWebKit={true}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest} // Intercept ad URLs
+        userAgent={userAgent}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
         }}
       />
-      {/* Floating Button */}
-      {isButtonVisible && (
-        <FadeInView duration={0} delay={1000}>
+      {shouldRenderButton && (
+        <Animated.View style={[
+          styles.floatingButton,
+          { transform: [{ translateX: buttonPosition }] }
+        ]}>
           <TouchableOpacity
-            style={styles.floatingButton}
-            onPress={() => {
-              navigation.popToTop();
-            }}
+            style={styles.buttonContent}
+            onPress={() => navigation.popToTop()}
           >
-            <View style={styles.buttonContent}>
-              <Entypo name="home" size={10} color="white" />
-            </View>
+            <Entypo name="home" size={20} color="white" />
           </TouchableOpacity>
-        </FadeInView>
+        </Animated.View>
       )}
     </View>
   );
@@ -725,9 +811,8 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{
-        gestureEnabled: true, // Keep this enabled globally
-        gestureResponseDistance: 30, // Adjust swipe sensitivity
-        fullScreenGestureEnabled: true // For iOS native gesture
+        gestureEnabled: true,
+        gestureResponseDistance: 30,
       }}>
         <Stack.Screen
           name="Home"
@@ -905,9 +990,9 @@ const styles = StyleSheet.create({
     bottom: 90,
     right: 10,
     backgroundColor: 'black',
-    borderRadius: 30, // Half of width/height for perfect circle
-    width: 20,
-    height: 20,
+    borderRadius: 10, // Half of width/height for perfect circle
+    width: 35,
+    height: 35,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5, // For Android shadow
@@ -915,15 +1000,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 7,
+    padding: 5,
+    opacity:0.7
   },
   buttonContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  buttonTextFloating: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 0,
   }
 });
 
