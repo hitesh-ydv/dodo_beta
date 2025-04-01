@@ -580,11 +580,40 @@ const WebViewScreen = ({ route, navigation }) => {
   const buttonPosition = useRef(new Animated.Value(100)).current; // Start off-screen
   const isMounted = useRef(true);
   const isPortraitRef = useRef(isPortrait);
+  const [pageTitle, setPageTitle] = useState('');
+  const [isHeaderVisible, setIsHeaderVisible] = useState(showHeader && isPortrait);
+  // Add these new state variables
+  const [progress, setProgress] = useState(new Animated.Value(0));
+  const [loading, setLoading] = useState(false);
+  // Add progress bar animation config
+  const progressAnimation = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%']
+  });
 
-    // Sync ref with portrait state
-    useEffect(() => {
-      isPortraitRef.current = isPortrait;
-    }, [isPortrait]);
+  // Update header visibility state
+  useEffect(() => {
+    setIsHeaderVisible(showHeader && isPortrait);
+  }, [showHeader, isPortrait]);
+
+  // Sync ref with portrait state
+  useEffect(() => {
+    isPortraitRef.current = isPortrait;
+  }, [isPortrait]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: pageTitle || 'Loading...', // Show 'Loading...' when title is empty
+    });
+    console.log("Page Title -", pageTitle);
+  }, [pageTitle, navigation]);
+
+  // Update header visibility when orientation or showHeader changes
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: showHeader && isPortrait,
+    });
+  }, [showHeader, isPortrait, navigation]);
 
   useEffect(() => {
     return () => {
@@ -597,7 +626,7 @@ const WebViewScreen = ({ route, navigation }) => {
     if (!isMounted.current) return;
 
     const showButton = isButtonVisible && isPortraitRef.current;
-    
+
     if (showButton) {
       setShouldRenderButton(true);
       Animated.spring(buttonPosition, {
@@ -620,13 +649,13 @@ const WebViewScreen = ({ route, navigation }) => {
     return () => buttonPosition.stopAnimation();
   }, [isButtonVisible, isPortrait]);
 
-    // Orientation change handler
-    useEffect(() => {
-      if (!isPortrait) {
-        // Immediately hide button when switching to landscape
-        setButtonVisible(false);
-      }
-    }, [isPortrait]);
+  // Orientation change handler
+  useEffect(() => {
+    if (!isPortrait) {
+      // Immediately hide button when switching to landscape
+      setButtonVisible(false);
+    }
+  }, [isPortrait]);
 
   // Update navigation options based on canGoBack state
   useEffect(() => {
@@ -683,7 +712,7 @@ const WebViewScreen = ({ route, navigation }) => {
   };
 
 
-  StatusBar.setBarStyle('light-content'); // Set status bar text color to white
+  StatusBar.setBarStyle('dark-content'); // Set status bar text color to white
 
   useEffect(() => {
     if (showHeader) {
@@ -763,8 +792,18 @@ const WebViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={{ flex: 1 }} onTouchStart={handleUserInteraction}>
-      {showHeader && isPortrait && <SafeAreaView style={styles.header} />} 
-      
+      {/* Progress Bar - Only show when header is visible */}
+      {isHeaderVisible && loading && (
+        <Animated.View 
+          style={[
+            styles.progressBar,
+            { 
+              width: progressAnimation,
+              top: 0 // Height of header (adjust if your header has different height)
+            }
+          ]}
+        />
+      )}
       <WebView
         key={url}
         ref={webViewRef}
@@ -772,7 +811,7 @@ const WebViewScreen = ({ route, navigation }) => {
         style={{ flex: 1 }}
         originWhitelist={['*']}
         mediaPlaybackRequiresUserAction={false}
-        allowsInlineMediaPlayback={!showHeader}
+        allowsInlineMediaPlayback={true}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         prefersHomeIndicatorAutoHidden={true}
@@ -784,6 +823,30 @@ const WebViewScreen = ({ route, navigation }) => {
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
+          setPageTitle(navState.title);
+        }}
+        // ... existing props
+        onLoadStart={() => {
+          setLoading(true);
+          Animated.timing(progress, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false
+          }).start();
+        }}
+        onLoadProgress={({ nativeEvent }) => {
+          Animated.timing(progress, {
+            toValue: nativeEvent.progress,
+            duration: 100,
+            useNativeDriver: false
+          }).start();
+        }}
+        onLoadEnd={() => {
+          Animated.timing(progress, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: false
+          }).start(() => setLoading(false));
         }}
       />
       {shouldRenderButton && (
@@ -822,7 +885,10 @@ const App = () => {
         <Stack.Screen
           name="WebView"
           component={WebViewScreen}
-          options={{ headerShown: false }}
+          options={({ route }) => ({
+            // Initial header configuration
+            headerShown: route.params?.showHeader ?? false,
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -1001,11 +1067,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 7,
     padding: 5,
-    opacity:0.7
+    opacity: 0.7
   },
   buttonContent: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  progressBar: {
+    height: 2,
+    backgroundColor: '#007AFF',
+    position: 'absolute',
+    zIndex: 999,
+    left: 0,
   }
 });
 
