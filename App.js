@@ -825,7 +825,6 @@ const WebViewScreen = ({ route, navigation }) => {
           setCanGoBack(navState.canGoBack);
           setPageTitle(navState.title);
         }}
-        // ... existing props
         onLoadStart={() => {
           setLoading(true);
           Animated.timing(progress, {
@@ -849,7 +848,7 @@ const WebViewScreen = ({ route, navigation }) => {
           }).start(() => setLoading(false));
         }}
       />
-      {shouldRenderButton && (
+      {!showHeader && shouldRenderButton && (
         <Animated.View style={[
           styles.floatingButton,
           { transform: [{ translateX: buttonPosition }] }

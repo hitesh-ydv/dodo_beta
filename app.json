@@ -8,6 +8,19 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true
+          },
+          "ios": {}
+        }
+      ]
+    ],
     "splash": {
       "image": "./assets/2025_Transparant-19-modified.png",
       "resizeMode": "contain",
@@ -16,7 +29,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dodowebview.app",
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.0"
     },
     "android": {
       "adaptiveIcon": {
